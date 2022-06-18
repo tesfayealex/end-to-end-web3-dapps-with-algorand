@@ -2,11 +2,12 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from api.models import Profile
-from django.contrib.auth.models import User
-from rest_framework.decorators import api_view
+from django.contrib.auth.models import User 
+from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view,permission_classes
 # Create your views here.
 from time import time, sleep
-
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from algosdk import account, encoding
 from algosdk.logic import get_application_address
 # from api.auction.operations import createAuctionApp, setupAuctionApp, placeBid, closeAuction
@@ -25,6 +26,16 @@ from .helper import getAlgodClient,getKmdClient,getGenesisAccounts,getTemporaryA
 
 client = getAlgodClient()
 
+def returnUsersObjFromToken(token):
+    user = Token.objects.get(key=token[1])
+    users = Profile.objects.filter(user=user.user)
+    if users.exists():
+        users = users.first()
+        print(users)
+        # setExpired(users)
+        return users
+    return None
+
 class IndexAPI(APIView):
     def get(self, request):
         return Response({"message": "HELLO WORLD!"})
@@ -35,6 +46,7 @@ def hello_world(request):
     return Response({"message": "HELLO WORLD! FROM FUNCTION"})
 
 @api_view()
+@permission_classes((AllowAny,))
 def connect_to_algo(request):
     # client = getAlgodClient()
     creator = getTemporaryAccount(client)
@@ -43,14 +55,17 @@ def connect_to_algo(request):
     return Response({"message": "Connected To Algo"})
 
 @api_view()
+@permission_classes((IsAuthenticated,))
 def get_all_user_a_wallet(request):
     # print("*******************")
     # user_list = User.objects.all()
-    list = Profile.objects.all()[0]
-    
+    users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
+    user_list = User.objects.all().filter(username='tesfaye')
+    print(user_list[0].username)
+    list = users
     print(list)
     print(list.user.is_staff)
-    list.address = None
+    # list.address = None
     if list.address is None or not list.address :
         # print("*******************")
         creator = getTemporaryAccount(client)
