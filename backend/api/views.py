@@ -1,28 +1,18 @@
 from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from api.models import Profile
+from api.models import Profile, CertificateRequests
 from django.contrib.auth.models import User 
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view,permission_classes
 # Create your views here.
 from time import time, sleep
+from datetime import datetime
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from algosdk import account, encoding
 from algosdk.logic import get_application_address
-# from api.auction.operations import createAuctionApp, setupAuctionApp, placeBid, closeAuction
-# from api.auction.util import (
-#     getBalances,
-#     getAppGlobalState,
-#     getLastBlockTimestamp,
-# )
-# from api.auction.testing.setup import getAlgodClient
-# from api.auction.testing.resources import (
-#     getTemporaryAccount,
-#     optInToAsset,
-#     createDummyAsset,
-# )
-from .helper import getAlgodClient,getKmdClient,getGenesisAccounts,getTemporaryAccount,createDummyAsset,optInToAsset
+
+from .helper import getAlgodClient,getKmdClient,getGenesisAccounts,getTemporaryAccount,createAsset,optInToAsset
 
 client = getAlgodClient()
 
@@ -54,56 +44,114 @@ def connect_to_algo(request):
     print(client)
     return Response({"message": "Connected To Algo"})
 
+@api_view(["POST"])
+@permission_classes((IsAuthenticated,))
+def get_user_detail(request):
+    users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
+    certificate_list = CertificateRequests.objects.all().filter(user=users.user)
+    assets = {}
+    if users.certificate_id != "":
+        asset = client.account_asset_info(address= users.address , asset_id=users.certificate_id)
+    return Response({"is_staff": users.user.is_staff , "certificate_list" : len(certificate_list) , "certificate_ready": users.certificate_id  , "claimed": users.claimed, "asset" : asset})
+
 @api_view()
 @permission_classes((IsAuthenticated,))
-def get_all_user_a_wallet(request):
-    # print("*******************")
-    # user_list = User.objects.all()
+def get_request_list(request):
     users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
-    user_list = User.objects.all().filter(username='tesfaye')
-    print(user_list[0].username)
-    list = users
-    print(list)
-    print(list.user.is_staff)
-    # list.address = None
-    if list.address is None or not list.address :
-        # print("*******************")
-        creator = getTemporaryAccount(client)
-        list.address = creator.getAddress()
-        list.private_key = creator.getPrivateKey()
-        list.save()
-    # print(user_list)
-    # client = getAlgodClient()
-
-    # print(client)
-    return Response({"message": "all users have a wallet" , "user_address": list.address})
+    if users.user.is_staff == True:
+        certificate_list = CertificateRequests.objects.all().filter()
+        requesters = []
+        for c in certificate_list:
+            profile = Profile.objects.all().filter(user=c.user)
+            profile = profile.first()
+            print(profile.certificate_id)
+            print(c.user.is_staff)
+            print(c.user.username)
+            if profile.certificate_id == "" and c.user.is_staff != True:
+                requesters.append({"first_name": c.user.first_name , "last_name": c.user.last_name , "user_id": c.user.id})
+        return Response({"requesters": requesters})
+    else:
+        return Response({"requesters": []})
 
 @api_view()
-def create_new_nft(request):
-    # client = getAlgodClient()
-    # print(client)
-    list = Profile.objects.all()[0]
+@permission_classes((IsAuthenticated,))
+def send_certificate_request(request):
+    users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
+    certificate_list = CertificateRequests.objects.all().filter(user=users.user)
+    if len(certificate_list) == 0:
+        CertificateRequests.objects.create(
+            user =  users.user,
+            date =  datetime.now()
+        )
+    else:
+        return Response({"success": False , "message": "Already sent a request"})
+    return Response({"success": True , "message": "Certificate Request has been successfully sent"})
+
+@api_view()
+@permission_classes((AllowAny,))
+def get_all_user_a_wallet(request):
+    #
+    user_list = Profile.objects.all().filter()
+
+    for list in user_list:
+     
+        if list.address is None or not list.address :
+            # print("*******************")
+            creator = getTemporaryAccount(client)
+            list.address = creator.getAddress()
+            list.private_key = creator.getPrivateKey()
+            list.save()
     
+    return Response({"message": "all users have a wallet" , "user_address": list.address})
+
+
+
+@api_view(["POST"])
+def create_new_nft(request):
+    users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
+    user = User.objects.all().filter(id=request.data['user_id'])[0]
+    list = Profile.objects.all().filter(user=user.id).first()
+
     print(list)
     print(list.user.is_staff)
     nftAmount = 1
     ftID = None
-    if list.user.is_staff == True:
+    if users.user.is_staff == True:
         account_info = client.account_info(list.address)
         print("**********account**************")
         print(list.private_key)
-        ftID = createDummyAsset(client, nftAmount, list.address , list.private_key, 'trainee1')
-        list.certificate_id = ftID
-        list.save()
-    return Response({"message": "minted a new nft" , 'nft_id' : ftID})
+        url = request.data['url']
+        if url != '':
+            ftID = createAsset(client, url,nftAmount, list.address , list.private_key, 'trainee1')
+            list.certificate_id = ftID
+            list.claimed = False
+            list.save()
+        else:
+            return Response({"success": False , "message": "Url was not provided"})
+    else:
+        return Response({"success": False , "message": "You are not staff"})
+
+    return Response({"success": True ,"message": "minted a new nft" , 'nft_id' : ftID})
 
 @api_view()
 def optin_to_asset(request):
-    list = Profile.objects.all()[0]
-    if list.user.is_staff == True:
-        print(list.certificate_id)
-        optInToAsset(client, list.certificate_id, list.a)
-    return Response({"message": "optin_to_asset"})
+    users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
+    if users.user.is_staff == False:
+        print(users.certificate_id)
+        optInToAsset(client,users.private_key , users.certificate_id, users.address)
+        users.claimed = True
+
+    asset = client.account_asset_info(address= users.address  , asset_id=users.certificate_id)
+    return Response({"message": "asset successfully claimed", "asset_info":asset})
+
+@api_view(["POST"])
+@permission_classes((AllowAny,))
+def get_asset_info(request):
+    
+    users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
+    asset = client.account_asset_info(address= users.address , asset_id=request.data['asset_id'])
+   
+    return Response({"message": "optin_to_asset", "asset_info":asset})
 
 @api_view()
 def get_all_user(request):
@@ -111,8 +159,4 @@ def get_all_user(request):
     print(client)
     return Response({"message": "get_all_user"})
 
-# @api_view()
-# def get_all_user_a_wallet(request):
-#     client = getAlgodClient()
-#     print(client)
-#     return Response({"message": "all users have a wallet"})
+

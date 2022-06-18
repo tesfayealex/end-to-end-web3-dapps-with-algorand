@@ -95,7 +95,7 @@ def getGenesisAccounts() -> List[Account]:
 
     return kmdAccounts
 
-def createDummyAsset(client: AlgodClient, url: None , total: int, account: Account = None , private_key = None,account_name = "Unknown") -> int:
+def createAsset(client: AlgodClient, url: None , total: int, account: Account = None , private_key = None,account_name = "Unknown") -> int:
     if account is None:
         print("if statement")
         account = getTemporaryAccount(client)
