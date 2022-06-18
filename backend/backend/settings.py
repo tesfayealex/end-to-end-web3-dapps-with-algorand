@@ -26,7 +26,8 @@ SECRET_KEY = 'django-insecure-0&mxr1v9qs#%51z3m)lu^@%8^glj3o-$v#l*rp^&slmeat+&h9
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'localhost'
+    'localhost',
+    '192.168.0.171'
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
+    'rest_framework.authtoken',
     'api'
 ]
 
@@ -78,7 +80,13 @@ TEMPLATES = [
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-    ]
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+               'rest_framework.authentication.TokenAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES':(
+                'rest_framework.permissions.IsAuthenticated',
+    ),
 }
 
 WSGI_APPLICATION = 'backend.wsgi.application'
