@@ -95,7 +95,7 @@ def getGenesisAccounts() -> List[Account]:
 
     return kmdAccounts
 
-def createDummyAsset(client: AlgodClient, total: int, account: Account = None , private_key = None,account_name = "Unknown") -> int:
+def createDummyAsset(client: AlgodClient, url: None , total: int, account: Account = None , private_key = None,account_name = "Unknown") -> int:
     if account is None:
         print("if statement")
         account = getTemporaryAccount(client)
@@ -117,7 +117,7 @@ def createDummyAsset(client: AlgodClient, total: int, account: Account = None , 
         clawback=account, #.getAddress(),
         unit_name= account_name, #f"D{randomNumber}",
         asset_name= "10 Academy Certificate", #f"Dummy {randomNumber}",
-        url=f"https://dummy.asset/{randomNumber}",
+        url=url,
         note=randomNote,
         sp=client.suggested_params(),
     )
@@ -130,14 +130,15 @@ def createDummyAsset(client: AlgodClient, total: int, account: Account = None , 
     return response.assetIndex
 
 def optInToAsset(
-    client: AlgodClient, assetID: int, account: Account
+    client: AlgodClient, private_key:None , assetID: int, account: Account
 ) -> PendingTxnResponse:
+    
     txn = transaction.AssetOptInTxn(
-        sender=account.getAddress(),
+        sender=account, #.getAddress(),
         index=assetID,
         sp=client.suggested_params(),
     )
-    signedTxn = txn.sign(account.getPrivateKey())
+    signedTxn = txn.sign(private_key)
 
     client.send_transaction(signedTxn)
     return waitForTransaction(client, signedTxn.get_txid())

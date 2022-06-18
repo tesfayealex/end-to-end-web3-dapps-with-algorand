@@ -12,6 +12,7 @@ class Profile(models.Model):
     address = models.TextField(max_length=500, blank=True)
     private_key = models.TextField(max_length=500 , blank=True)
     certificate_id = models.TextField(max_length=500 , blank=True)
+    claimed = models.BooleanField(default=False)
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
