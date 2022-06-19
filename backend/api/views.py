@@ -49,9 +49,13 @@ def connect_to_algo(request):
 def get_user_detail(request):
     users = returnUsersObjFromToken(str(request.META.get('HTTP_AUTHORIZATION')).split(" "))
     certificate_list = CertificateRequests.objects.all().filter(user=users.user)
-    assets = {}
+    asset = {}
+    print(client)
     if users.certificate_id != "":
-        asset = client.account_asset_info(address= users.address , asset_id=users.certificate_id)
+        try:
+            asset = client.account_asset_info(address= users.address , asset_id=users.certificate_id)
+        except:
+            print("error")
     return Response({"is_staff": users.user.is_staff , "certificate_list" : len(certificate_list) , "certificate_ready": users.certificate_id  , "claimed": users.claimed, "asset" : asset})
 
 @api_view()
